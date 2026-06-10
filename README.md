@@ -9,5 +9,5 @@ Based on the original PFN architecture ([Müller et al., 2021](https://doi.org/1
 - [mvpfn/](mvpfn/) 
   - [model.py](mvpfn/model.py) model architecture
   - [bar_distribution.py](mvpfn/bar_distribution.py) Riemann distribution
-  - [train.py](train.py) prior-data fitting
+  - [train.py](mvpfn/train.py) prior-data fitting
 - [notebooks/](notebooks/) experiments
