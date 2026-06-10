@@ -62,8 +62,8 @@ class BarDistribution(nn.Module):
 
         idx = torch.searchsorted(self.borders, y) - 1 # index of the bucket that contains the target
         
-        idx[y == self.borders[0]] = 0  # y at lower support bound -> first bucket
-        idx[y == self.borders[-1]] = self.num_bars - 1  # y at upper support bound -> last bucket
+        idx[y == self.borders[0]] = 0 # y at lower support bound -> first bucket
+        idx[y == self.borders[-1]] = self.num_bars - 1 # y at upper support bound -> last bucket
         
         return idx
 
