@@ -7,6 +7,8 @@ Based on the original PFN architecture ([Müller et al., 2021](https://doi.org/1
 ## Structure
 
 - [mvpfn/](mvpfn/) 
+  - [extensions/](mvpfn/extensions/)
+    - [dopfn/](mvpfn/extensions/dopfn/) extension for interventional queries
   - [priors/](mvpfn/priors/)
     - [regression.py](mvpfn/priors/regression.py) linear-function prior
     - [gp.py](mvpfn/priors/gp.py) Gaussian-process prior
