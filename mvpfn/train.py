@@ -79,8 +79,8 @@ def train(
         get_batch (GetBatch): Prior sampler returning one batch ``(x, y)`` of shape ``(seq_len, batch, num_features)`` and ``(seq_len, batch)``, respectively.
         steps (int): Number of optimisation steps (datasets batches).
         lr (float): Adam learning rate.
-        n_train_sampler (Callable[[int], int] | None): Maps ``seq_len`` to ``n_train`` (training
-            points); the rest are query points. Defaults to a uniform draw in ``[1, seq_len - 1]``.
+        n_train_sampler (Callable[[int], int] | None): Maps ``seq_len`` to ``n_train`` (training points); 
+            the rest are query points. Defaults to a uniform draw in ``[1, seq_len - 1]``.
         grad_clip (float): Max gradient norm for clipping.
         device (str | torch.device): Device to train on.
         log_every (int): Steps between average-loss logs (``0`` to disable).

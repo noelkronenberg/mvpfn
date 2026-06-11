@@ -1,5 +1,5 @@
 """
-Gaussian-process prior (RBF kernel) for PFN training and an exact GP posterior for comparison.
+Gaussian-process (GP) prior for PFN training and an exact GP posterior for comparison.
 
 References:
 - https://github.com/automl/TransformersCanDoBayesianInference/blob/9c20031b355923bdd456d5fcfe4e98092b016b97/priors/fast_gp.py
@@ -15,7 +15,7 @@ from mvpfn.train import GetBatch
 
 def _rbf_kernel(lengthscale: float) -> gpytorch.kernels.Kernel:
     """
-    RBF kernel with a fixed length scale.
+    Radial Basis Function (RBF) kernel with a fixed length scale.
 
     Args:
         lengthscale (float): RBF kernel length scale.
