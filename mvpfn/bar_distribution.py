@@ -17,13 +17,15 @@ class BarDistribution(nn.Module):
     Discretised distribution over a fixed set of bucket borders (Riemann distribution) [Müller et al., 2021, p. 5].
     """
 
-    def __init__(self, borders: torch.Tensor) -> None:
+    def __init__(self, borders: torch.Tensor, full_support: bool = False) -> None:
         """
         Initialise the bar distribution from its bucket borders.
 
         Args:
             borders (torch.Tensor): Sorted 1D tensor of bucket borders of shape ``(num_bars + 1,)``, 
                 starting at the support minimum and ending at the support maximum.
+            full_support (bool): If ``True``, replace the outer buckets with Half-Normal tails 
+                so the distribution has infinite support.
 
         Raises:
             ValueError: If ``borders`` is not a sorted 1D tensor with at least two entries.
@@ -48,6 +50,25 @@ class BarDistribution(nn.Module):
         )
 
         self.num_bars = len(borders) - 1
+        self.full_support = full_support
+
+    @staticmethod
+    def _half_normal(range_max: torch.Tensor) -> torch.distributions.HalfNormal:
+        """
+        Half-Normal scaled so that half its mass lies within ``range_max`` [Müller et al., 2021, p. 18] [https://github.com/automl/TransformersCanDoBayesianInference/blob/9c20031b355923bdd456d5fcfe4e98092b016b97/bar_distribution.py#L85].
+
+        Args:
+            range_max (torch.Tensor): Maximum value of the range.
+
+        Returns:
+            torch.distributions.HalfNormal: Half-Normal distribution.
+        """
+
+        scale = range_max / torch.distributions.HalfNormal( # scale so that half its mass lies within range_max
+            torch.tensor(1.0) # standard Half-Normal distribution
+            ).icdf(torch.tensor(0.5)) # median of the standard Half-Normal distribution
+
+        return torch.distributions.HalfNormal(scale) # Half-Normal distribution with the calculated scale
 
     def _bucket_of(self, y: torch.Tensor) -> torch.Tensor:
         """
@@ -99,7 +120,9 @@ class BarDistribution(nn.Module):
 
         target_bucket = self._bucket_of(y) # index of the bucket that contains the target
 
-        if (target_bucket < 0).any() or (target_bucket >= self.num_bars).any():
+        if self.full_support:
+            target_bucket = target_bucket.clamp(0, self.num_bars - 1) # outer buckets extend to infinite support, so out-of-range y maps to them [https://github.com/automl/TransformersCanDoBayesianInference/blob/9c20031b355923bdd456d5fcfe4e98092b016b97/bar_distribution.py#L92]
+        elif (target_bucket < 0).any() or (target_bucket >= self.num_bars).any():
             raise ValueError(
                 f"y {y} not in support set for borders (min_y, max_y) {self.borders}"
             )
@@ -109,7 +132,27 @@ class BarDistribution(nn.Module):
             target_bucket.unsqueeze(-1) # (n_test, batch) -> (n_test, batch, 1), as gather requires rank to match
         ) \
         .squeeze(-1) # (n_test, batch, 1) -> (n_test, batch), squeeze out the last dimension again
-        
+
+        if self.full_support:
+            left, right = self._half_normal(self.bucket_widths[0]), self._half_normal(self.bucket_widths[-1]) # Half-Normal distributions for the left and right tails
+            in_left, in_right = target_bucket == 0, target_bucket == self.num_bars - 1 # indices of the left and right tails
+            
+            # swap the uniform outer buckets for Half-Normal tails [Müller et al., 2021, Equation (30)]
+            # add back log(width) to undo the uniform density, then apply the tail density
+            # as per original implementation (already in NLL space) [https://github.com/automl/TransformersCanDoBayesianInference/blob/9c20031b355923bdd456d5fcfe4e98092b016b97/bar_distribution.py#L104]
+            
+            distance_left_border = (self.borders[1] - y[in_left]).clamp(min=1e-8) # distance the inner edge of the first bucket to the target
+            nll[in_left] -= (
+                left.log_prob(distance_left_border) # log probability of the distance (where 0 = most likely, far out = least likely)
+                    + torch.log(self.bucket_widths[0]) # add back log(width) to undo the uniform density, as we have a Half-Normal distribution
+                )
+
+            distance_right_border = (y[in_right] - self.borders[-2]).clamp(min=1e-8) # distance the inner edge of the last bucket to the target
+            nll[in_right] -= (
+                right.log_prob(distance_right_border)
+                    + torch.log(self.bucket_widths[-1])
+            )
+
         return nll
 
     def mean(self, logits: torch.Tensor) -> torch.Tensor:
@@ -124,7 +167,14 @@ class BarDistribution(nn.Module):
         """
 
         bucket_centers = (self.borders[:-1] + self.borders[1:]) / 2 # center of each bucket
-        mean =  torch.softmax(logits, dim=-1) @ bucket_centers # probability mass * bucket center
+
+        if self.full_support:
+            left, right = self._half_normal(self.bucket_widths[0]), self._half_normal(self.bucket_widths[-1]) # Half-Normal distributions for the left and right tails
+            bucket_centers = bucket_centers.clone() # copy the bucket centers
+            bucket_centers[0] = self.borders[1] - left.mean # subtract the left tail mean to get the left tail center, as per original implementation [https://github.com/automl/TransformersCanDoBayesianInference/blob/9c20031b355923bdd456d5fcfe4e98092b016b97/bar_distribution.py#L110]
+            bucket_centers[-1] = self.borders[-2] + right.mean # add the right tail mean to get the right tail center
+
+        mean = torch.softmax(logits, dim=-1) @ bucket_centers # probability mass * bucket center
 
         return mean
 
