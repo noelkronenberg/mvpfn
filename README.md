@@ -6,7 +6,7 @@ Based on the original PFN architecture ([Müller et al., 2021](https://doi.org/1
 
 <img width="1189" height="390" alt="image" src="https://github.com/user-attachments/assets/cd39864c-f7ee-4a3e-b127-8b780beeaa5a" />
 
-*Replication of Figure 3 from Müller et al. (2021) using on MVPFN.*
+*Replication of Figure 3 from Müller et al. (2021) using MVPFN.*
 
 ## Structure
 
